@@ -1,0 +1,42 @@
+[
+  {
+    "Id": 1,
+    "Name": "Cristiano Ronaldo"
+  },
+  {
+    "Id": 2,
+    "Name": "LeBron James"
+  },
+  {
+    "Id": 3,
+    "Name": "Lionel Messi"
+  },
+  {
+    "Id": 4,
+    "Name": "Roger Federer"
+  },
+  {
+    "Id": 5,
+    "Name": "Tiger Woods"
+  },
+  {
+    "Id": 6,
+    "Name": "Neymar"
+  },
+  {
+    "Id": 7,
+    "Name": "Virat Kohli"
+  },
+  {
+    "Id": 8,
+    "Name": "Serena Williams"
+  },
+  {
+    "Id": 9,
+    "Name": "Rafael Nadal"
+  },
+  {
+    "Id": 10,
+    "Name": "Usain Bolt"
+  }
+]

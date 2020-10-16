@@ -1,0 +1,298 @@
+﻿@{
+    ViewData["Title"] = "Home Page";
+}
+
+<div class="text-center">
+    <h1 class="display-4 timer">00:00</h1>
+    <h3 class="text-muted font-weight-light">
+        Level: <span id="lbl_level">0</span> <label class="font-weight-bold">|</label>
+        Shuttle: <span id="lbl_shuttle">0</span>
+    </h3>
+    @*<p class="text-muted font-weight-normal">mm:ss</p>*@
+    <button class="btn" id="btn_start">
+        <h4><i class="fas fa-play text-success"></i></h4>
+    </button>
+    <button class="btn" id="btn_stop" disabled>
+        <h4><i class="fas fa-stop text-danger"></i></h4>
+    </button>
+</div>
+<div class="progress">
+    <div class="progress-bar progress-bar-striped" role="progressbar" id="progress_bar" style="width: 0%" aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+</div>
+<hr />
+<div class="text-center">
+    <div class="row">
+        <div class="col">
+            <p class="font-weight-bold">NEXT SHUTTLE</p>
+            <span id="txt_next_shuttle">00</span>
+            <span id="txt_next_shuttle">s</span>
+        </div>
+        <div class="col">
+            <p class="font-weight-bold">SPEED</p>
+            <p>
+                <span id="txt_speed">0.0</span>
+                <span>km/h</span>
+            </p>
+        </div>
+        <div class="col">
+            <p class="font-weight-bold">TOTAL DISTANCE</p>
+            <p>
+                <span id="txt_total_distance">0.0</span>
+                <span>m</span>
+            </p>
+        </div>
+    </div>
+</div>
+<div class="table-responsive">
+    <table class="table table-striped" id="tbl_atheletes">
+        <thead>
+            <tr>
+                <th>S#</th>
+                <th>Name</th>
+                <th>Action</th>
+                <th>Score</th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var athelete in ViewBag.Athelets)
+            {
+                <tr>
+                    <td>@athelete.Id</td>
+                    <td>@athelete.Name</td>
+                    <td>
+                        <span data-athelete-id="@athelete.Id"></span>
+                        <button class="btn btn-sm btn-danger p-1 m-1 btn-athelete-warn" disabled data-athelete-id="@athelete.Id">Warn</button>
+                        <button class="btn btn-sm btn-dark p-1 m-1 btn-athelete-stop" disabled data-athelete-id="@athelete.Id">Stop</button>
+                    </td>
+                    <td>
+                        <div class="row">
+                            <div class="col">
+                                <input class="form-control form-control-sm txt-level" type="text" readonly data-athelete-id="@athelete.Id" placeholder="level">
+                            </div>
+                            <div class="col">
+                                <input class="form-control form-control-sm txt-shuttle" type="text" readonly data-athelete-id="@athelete.Id" placeholder="shuttle">
+                            </div>
+                            <div class="col">
+                                <button class="btn btn-sm btn-athelete-score" data-athelete-id="@athelete.Id" style="display:none"><i class="fas fa-edit text-primary"></i></button>
+                            </div>
+                        </div>
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</div>
+@*<div class="text-center">
+        <span class="timer"></span>
+    </div>*@
+
+@section Scripts{
+    <script type="text/javascript">
+
+        /*
+         * Overall timer logic
+         *
+         * 1. Get the list of all the Fitness ratings using API on page load
+         * 2. Initialize shuttle pointer n to 0
+         * 3. Set current shuttle and next shuttle based on pointer
+         * 3. Start timer on start button click
+         * 4. Calculate Progress and time remaining to next shuttle
+         * 5. Increment pointer by 1 when timer reaches next shuttle's start time
+         * 6. Display current shuttle information on html elements
+        */
+
+        /*
+         * Overall Score and Warning logic
+         * 
+         * 1. Disable warning button on click
+         * 2. Disable warning and stop buttons on stop button click
+         * 3. Set current level and shuttle to athelete's score as pointed by pointer n
+         * 4. Show Edit button
+         * 5. Toggle readonly textbox on Edit button click, toggle icon from edit to Check
+        */
+
+        // Global Variables
+        fitnessRatings = [];
+        startTimes = [];
+        var currTime, timer;
+        n = 0;
+        distance = 0;
+        var currFitnessRating, nextFitnessRating, nextShuttle;
+        progress = 0.0;
+        levelTime = 0.0;
+
+
+        // if the number is less than 10 then append a preceding 0
+        function pretty_time_string(num) {
+            return (num < 10 ? "0" : "") + num;
+        }
+
+        // API data on page load. Get all the Shuttle list for front-end calculations
+        $.get("/api/fitnessratings", function (data) {
+            fitnessRatings = data;
+            //startTimes = data.map(s => s.startTime);
+
+        });
+
+        // Button events
+
+        // Starts timer
+        $("#btn_start").click(function () {
+
+            // Disable start button. This restricts multiple clicks on start button.
+            $(this).prop('disabled', true);
+
+            // Enable stop button.
+            $("#btn_stop").prop('disabled', false);
+
+            // Reset all data before starting timer.
+            resetData();
+
+            // Logic:
+            // 1. Get start Datetime when user clicks the button
+            // 2. Subtract the Current time from start
+            // 3. Calculate hours, minutes and seconds from total difference of the two
+            // 4. Set proper display string and show the timer
+            // 5. Display data from current Fitness rating (shuttle)
+            // 6. Calculate time remaining for next shuttle and progress in seconds
+            // 7. Check if timer has reached next shuttle
+            // 8. Update pointer to current shuttle and next shuttle
+            // 9. Add distance from current shuttle if next shuttle has started.
+            // 10. Display updated shuttle
+            // 11. Repeat above steps every second.
+
+            var start = new Date;
+            timer = setInterval(function () {
+
+                // Difference is measured in ms. So we have to divide it by 1000
+                var total_seconds = (new Date - start) / 1000;
+
+                // Get hours by dividing the seconds with 3600. In our case it will be 0 till the timer reached above 1 hour. **Irrelevant for our application
+                var hours = Math.floor(total_seconds / 3600);
+                total_seconds = total_seconds % 3600;
+
+                // Get minutes by divding seconds with 60
+                var minutes = Math.floor(total_seconds / 60);
+                total_seconds = total_seconds % 60;
+
+                // Remaing seconds from division.
+                var seconds = Math.floor(total_seconds);
+
+                // Prettyfying hours, minutes and seconds by appending 0 if less than 10
+                hours = pretty_time_string(hours);
+                minutes = pretty_time_string(minutes);
+                seconds = pretty_time_string(seconds);
+
+                // Set time in mm:ss
+                var currentTimeString = minutes + ":" + seconds;
+
+                // Display time on html element with css class "timer"
+                $('.timer').text(currentTimeString);
+
+                //Set current rating with current pointer n. Initialy 0
+                setCurrentRating();
+
+                // Calculate time estimation to next shuttle. Data 01/01/2020 is used only to parse cummulativeTime and and currentTimeString.
+                nextShuttle = (Date.parse('01/01/2020 00:' + currFitnessRating.fitnessRating.commulativeTime) - Date.parse('01/01/2020 00:' + currentTimeString)) / 1000;
+
+                // Calculate progress based on current shuttle's levelTime and time remaining for next shuttle.
+                progress = (levelTime - nextShuttle) / (levelTime + 1);
+
+                // Check if timer has reached next shuttle
+                if (Date.parse('01/01/2020 00:' + currentTimeString) >= Date.parse('01/01/2020 00:' + nextFitnessRating.fitnessRating.startTime)) {
+                    n += 1; // update pointer to the shuttle
+                    distance += 40  // update distance covered by the athelete
+                }
+
+                // Display shuttle information on html elements
+                displayCurrentRating();
+
+            }, 1000);   // Repeat above process every 1000ms i.e. 1s
+        });
+
+
+        // Stop timer
+        $("#btn_stop").click(function () {
+            clearInterval(timer);   //Clear timer interval. It is necessary if we want to restart timer from beginning.
+            $(this).prop('disabled', true); // Disable stop button.
+            $("#btn_start").prop('disabled', false);    // Enable start button
+        });
+
+        // Warn athelete
+        $(".btn-athelete-warn").click(function () {
+            //console.log($(this).data("atheleteId"));
+            $(this).html("Warned"); // Change text of button from "Warn" to "Warned"
+            $(this).prop('disabled', true); // Disable warning button
+
+        });
+
+        // Stops athelete
+        $(".btn-athelete-stop").click(function () {
+            //console.log($(this).data("atheleteId"));
+            $(this).html("Stopped");    //  Change button text from "Stop" to "Stopped"
+            $(this).prop('disabled', true); //  Disable stop button
+            $('.btn-athelete-warn[data-athelete-id=' + $(this).data("atheleteId") + ']').prop('disabled', true);    // Even if player stop without warning. Warning button should be disabled on Stop.
+
+            $('.txt-level[data-athelete-id=' + $(this).data("atheleteId") + ']').val(currFitnessRating.speedLevel); // Set current level to readonly text box
+            $('.txt-shuttle[data-athelete-id=' + $(this).data("atheleteId") + ']').val(currFitnessRating.shuttleNo);    // Set current shuttle to readonly text box
+            $('.btn-athelete-score[data-athelete-id=' + $(this).data("atheleteId") + ']').show();   // Display Edit button
+
+        });
+
+        // Edit athelete score
+        $(".btn-athelete-score").click(function () {
+            //console.log($(this).data("atheleteId"));
+            $("i", this).toggleClass('fa-edit fa-check').toggleClass('text-primary text-success');  // Change the icon on Edit button to Check from Edit
+            $('.txt-level[data-athelete-id=' + $(this).data("atheleteId") + ']').prop('readonly', function (i, r) { return !r; });  // Toggle readonly mode of Level textbox
+            $('.txt-shuttle[data-athelete-id=' + $(this).data("atheleteId") + ']').prop('readonly', function (i, r) { return !r; });    // Toggle readonly mode of Shuttle textbox
+        });
+
+
+
+        // Helper functions
+
+        // Set the pointer to current shuttle and next shuttle
+        function setCurrentRating() {
+            currFitnessRating = fitnessRatings[n];  // Get current shuttle pointed by n
+            nextFitnessRating = fitnessRatings[n + 1];  // Get next shuttle pointed by n+1
+            levelTime = (Date.parse('01/01/2020 00:' + nextFitnessRating.fitnessRating.startTime) - Date.parse('01/01/2020 00:' + currFitnessRating.fitnessRating.startTime)) / 1000; // Get current shuttle time by the difference of next shuttle's startTime and current shuttle's startTime.
+        }
+
+        // Display the information of at respective html elements
+        function displayCurrentRating() {
+            $("#lbl_level").text(currFitnessRating.speedLevel);
+            $("#lbl_shuttle").text(currFitnessRating.shuttleNo);
+            $("#txt_speed").text(currFitnessRating.speed);
+            $("#txt_total_distance").text(distance);
+            $("#txt_next_shuttle").text(nextShuttle + 1); // +1 because next shuttle starts 1 second later
+            $('#progress_bar').attr('aria-valuenow', progress * 100).css('width', progress * 100 + '%');    // Set the progress bar percentage by multiplying progress value with 100
+        }
+
+        // Reset all data. Necessary to start timer from the beginning
+        function resetData() {
+
+            // Reset all variable values
+            n = 0;
+            distance = 0;
+            progress = 0.0;
+            levelTime = 0.0;
+
+            // Reset Warn and Stop buttons to their default state
+            $('.btn-athelete-warn').prop('disabled', false).html("Warn");
+            $('.btn-athelete-stop').prop('disabled', false).html("Stop");
+
+            // Reset all athelete scores
+            $('#tbl_atheletes').find('input[type=text]').each(function () {
+                $(this).prop("readonly", true);
+                $(this).val("");
+            });
+
+            // Reset all the edit buttons and hide
+            $('#tbl_atheletes').find('.btn-athelete-score').each(function () {
+                $("i", this).removeClass('text-success fa-check');
+                $("i", this).addClass('text-primary fa-edit');
+                $(this).hide();
+            });
+        }
+    </script>
+}
