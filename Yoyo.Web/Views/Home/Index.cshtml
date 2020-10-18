@@ -95,10 +95,10 @@
          * 1. Get the list of all the Fitness ratings using API on page load
          * 2. Initialize shuttle pointer n to 0
          * 3. Set current shuttle and next shuttle based on pointer
-         * 3. Start timer on start button click
-         * 4. Calculate Progress and time remaining to next shuttle
-         * 5. Increment pointer by 1 when timer reaches next shuttle's start time
-         * 6. Display current shuttle information on html elements
+         * 4. Start timer on start button click
+         * 5. Calculate Progress and time remaining to next shuttle
+         * 6. Increment pointer by 1 when timer reaches next shuttle's start time
+         * 7. Display current shuttle information on html elements
         */
 
         /*
@@ -253,8 +253,10 @@
 
         // Set the pointer to current shuttle and next shuttle
         function setCurrentRating() {
-            currFitnessRating = fitnessRatings[n];  // Get current shuttle pointed by n
-            nextFitnessRating = fitnessRatings[n + 1];  // Get next shuttle pointed by n+1
+            if (n < fitnessRatings.length) {
+                currFitnessRating = fitnessRatings[n];  // Get current shuttle pointed by n
+                nextFitnessRating = fitnessRatings[n + 1];  // Get next shuttle pointed by n+1
+            }
             levelTime = (Date.parse('01/01/2020 00:' + nextFitnessRating.fitnessRating.startTime) - Date.parse('01/01/2020 00:' + currFitnessRating.fitnessRating.startTime)) / 1000; // Get current shuttle time by the difference of next shuttle's startTime and current shuttle's startTime.
         }
 
